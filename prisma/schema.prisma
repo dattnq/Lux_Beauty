@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------
+// 1️⃣ CATEGORIES (Danh mục đa cấp)
+// ---------------------------------------------------------
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String
+  parentId  Int?       // Cho phép null nếu là danh mục gốc
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+  products  Product[]
+
+  @@map("Categories")
+}
+
+// ---------------------------------------------------------
+// 2️⃣ BRANDS
+// ---------------------------------------------------------
+model Brand {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?   @db.Text
+  logoUrl     String?
+  products    Product[]
+
+  @@map("Brands")
+}
+
+// ---------------------------------------------------------
+// 3️⃣ PRODUCTS (Sản phẩm gốc - Cha)
+// ---------------------------------------------------------
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?  @db.Text
+  ingredients String?  @db.Text // Thành phần
+  usageGuide  String?  @db.Text // Hướng dẫn sử dụng
+  
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  
+  brandId     Int
+  brand       Brand    @relation(fields: [brandId], references: [id])
+
+  variants    ProductVariant[]
+  
+  createdAt   DateTime @default(now())
+  status      Boolean  @default(true) // Active/Inactive
+
+  @@map("Products")
+}
+
+// ---------------------------------------------------------
+// 4️⃣ & 5️⃣ ATTRIBUTES (Màu & Size)
+// ---------------------------------------------------------
+model ProductColor {
+  id        Int              @id @default(autoincrement())
+  name      String           // Vd: Đỏ Ruby, Hồng Cánh Sen
+  code      String           // Vd: #FF0000
+  variants  ProductVariant[]
+
+  @@map("ProductColors")
+}
+
+model ProductSize {
+  id        Int              @id @default(autoincrement())
+  name      String           // Vd: 50ml, 100ml
+  unit      String           // Vd: ml, gram
+  variants  ProductVariant[]
+
+  @@map("ProductSizes")
+}
+
+// ---------------------------------------------------------
+// ⭐ 6️⃣ PRODUCT VARIANTS (TRUNG TÂM)
+// ---------------------------------------------------------
+model ProductVariant {
+  id        Int      @id @default(autoincrement())
+  sku       String   @unique // Mã quản lý kho (Vd: SRM-DO-50)
+  
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  colorId   Int?     // Có thể null nếu sp không có màu
+  color     ProductColor? @relation(fields: [colorId], references: [id])
+  
+  sizeId    Int?     // Có thể null nếu sp freesize
+  size      ProductSize?  @relation(fields: [sizeId], references: [id])
+
+  images      ProductImage[]
+  prices      ProductPrice[]
+  inventory   ProductInventory? // 1-1 relation (hoặc 1-n nếu nhiều kho)
+  cartItems   CartItem[]
+  orderDetails OrderDetail[]
+  reviews     Review[]
+  wishlists   Wishlist[]
+
+  status    Boolean  @default(true)
+
+  @@map("ProductVariants")
+}
+
+// ---------------------------------------------------------
+// 7️⃣ PRODUCT IMAGES (Theo Variant)
+// ---------------------------------------------------------
+model ProductImage {
+  id        Int            @id @default(autoincrement())
+  imageUrl  String
+  isPrimary Boolean        @default(false)
+  
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("ProductImages")
+}
+
+// ---------------------------------------------------------
+// 8️⃣ PRODUCT PRICES (Lịch sử giá)
+// ---------------------------------------------------------
+model ProductPrice {
+  id        Int            @id @default(autoincrement())
+  price     Decimal        @db.Decimal(10, 2)
+  startDate DateTime       @default(now())
+  endDate   DateTime?      // Null = Giá hiện tại đang áp dụng
+  
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("ProductPrices")
+}
+
+// ---------------------------------------------------------
+// 9️⃣ INVENTORIES (Kho)
+// ---------------------------------------------------------
+model ProductInventory {
+  id               Int            @id @default(autoincrement())
+  stockQuantity    Int            @default(0) // Số lượng thực trong kho
+  reservedQuantity Int            @default(0) // Số lượng khách đang giữ trong giỏ/chờ thanh toán
+  
+  variantId        Int            @unique // Mỗi variant có 1 record kho
+  variant          ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  
+  updatedAt        DateTime       @updatedAt
+
+  @@map("ProductInventories")
+}
+
+// ---------------------------------------------------------
+// 🔟 USERS & 1️⃣1️⃣ ADDRESSES
+// ---------------------------------------------------------
+enum Role {
+  CUSTOMER
+  ADMIN
+  STAFF
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String
+  fullName     String?
+  email        String    @unique
+  phone        String?
+  role         Role      @default(CUSTOMER)
+  status       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  addresses    UserAddress[]
+  orders       Order[]
+  cart         Cart?
+  reviews      Review[]
+  wishlists    Wishlist[]
+  voucherUsage VoucherUsage[]
+
+  @@map("Users")
+}
+
+model UserAddress {
+  id            Int     @id @default(autoincrement())
+  receiverName  String
+  phone         String
+  addressDetail String
+  isDefault     Boolean @default(false)
+  
+  userId        Int
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders        Order[]
+
+  @@map("UserAddresses")
+}
+
+// ---------------------------------------------------------
+// 1️⃣2️⃣ & 1️⃣3️⃣ CART (Giỏ hàng)
+// ---------------------------------------------------------
+model Cart {
+  id        Int        @id @default(autoincrement())
+  updatedAt DateTime   @updatedAt
+  
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  items     CartItem[]
+
+  @@map("Carts")
+}
+
+model CartItem {
+  id        Int            @id @default(autoincrement())
+  quantity  Int
+  
+  cartId    Int
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("CartItems")
+}
+
+// ---------------------------------------------------------
+// 1️⃣4️⃣ ORDERS (Đơn hàng)
+// ---------------------------------------------------------
+enum OrderStatus {
+  PENDING      // Chờ xác nhận
+  CONFIRMED    // Đã xác nhận
+  SHIPPING     // Đang giao
+  DELIVERED    // Đã giao
+  CANCELLED    // Đã hủy
+  RETURNED     // Trả hàng
+}
+
+model Order {
+  id             Int             @id @default(autoincrement())
+  orderDate      DateTime        @default(now())
+  status         OrderStatus     @default(PENDING)
+  
+  subTotal       Decimal         @db.Decimal(12, 2) // Tổng tiền hàng
+  discountAmount Decimal         @default(0) @db.Decimal(12, 2) // Tiền giảm giá
+  shippingFee    Decimal         @default(0) @db.Decimal(12, 2) // Phí ship
+  totalAmount    Decimal         @db.Decimal(12, 2) // Tổng thanh toán cuối cùng
+  
+  userId         Int
+  user           User            @relation(fields: [userId], references: [id])
+  
+  addressId      Int
+  address        UserAddress     @relation(fields: [addressId], references: [id])
+
+  orderDetails   OrderDetail[]
+  statusLogs     OrderStatusLog[]
+  payment        Payment?
+  shipment       Shipment?
+  voucherUsages  VoucherUsage[]
+
+  @@map("Orders")
+}
+
+// ---------------------------------------------------------
+// ⭐ 1️⃣5️⃣ ORDER DETAILS (Chi tiết đơn - Lưu giá lúc mua)
+// ---------------------------------------------------------
+model OrderDetail {
+  id        Int            @id @default(autoincrement())
+  quantity  Int
+  unitPrice Decimal        @db.Decimal(10, 2) // Giá tại thời điểm đặt hàng (QUAN TRỌNG)
+  
+  orderId   Int
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("OrderDetails")
+}
+
+model OrderStatusLog {
+  id        Int         @id @default(autoincrement())
+  oldStatus OrderStatus
+  newStatus OrderStatus
+  changedAt DateTime    @default(now())
+  
+  orderId   Int
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("OrderStatusLogs")
+}
+
+// ---------------------------------------------------------
+// 1️⃣7️⃣ & 1️⃣8️⃣ VOUCHERS
+// ---------------------------------------------------------
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+model Voucher {
+  id            Int            @id @default(autoincrement())
+  code          String         @unique
+  discountType  DiscountType
+  discountValue Decimal        @db.Decimal(10, 2)
+  minOrderValue Decimal?       @db.Decimal(10, 2)
+  startDate     DateTime
+  endDate       DateTime
+  usageLimit    Int            @default(100)
+  status        Boolean        @default(true)
+  
+  usages        VoucherUsage[]
+
+  @@map("Vouchers")
+}
+
+model VoucherUsage {
+  id        Int      @id @default(autoincrement())
+  usedAt    DateTime @default(now())
+  
+  voucherId Int
+  voucher   Voucher  @relation(fields: [voucherId], references: [id])
+  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id])
+
+  @@map("VoucherUsages")
+}
+
+// ---------------------------------------------------------
+// 1️⃣9️⃣ PAYMENTS
+// ---------------------------------------------------------
+enum PaymentMethod {
+  COD
+  BANK_TRANSFER
+  CREDIT_CARD
+  E_WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+  amount          Decimal       @db.Decimal(12, 2)
+  paymentMethod   PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  transactionCode String?       // Mã giao dịch ngân hàng/VNPAY
+  paidAt          DateTime?
+  
+  orderId         Int           @unique
+  order           Order         @relation(fields: [orderId], references: [id])
+
+  @@map("Payments")
+}
+
+// ---------------------------------------------------------
+// 2️⃣0️⃣ SHIPMENTS
+// ---------------------------------------------------------
+model Shipment {
+  id               Int       @id @default(autoincrement())
+  shippingProvider String    // GHN, GHTK, ViettelPost
+  trackingCode     String?   // Mã vận đơn
+  shippingFee      Decimal   @db.Decimal(10, 2)
+  status           String    // Trạng thái từ bên vận chuyển
+  shippedAt        DateTime?
+  deliveredAt      DateTime?
+  
+  orderId          Int       @unique
+  order            Order     @relation(fields: [orderId], references: [id])
+
+  @@map("Shipments")
+}
+
+// ---------------------------------------------------------
+// 2️⃣1️⃣ & 2️⃣2️⃣ REVIEWS & WISHLIST
+// ---------------------------------------------------------
+model Review {
+  id        Int            @id @default(autoincrement())
+  rating    Int            // 1-5 sao
+  comment   String?        @db.Text
+  createdAt DateTime       @default(now())
+  
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  
+  userId    Int
+  user      User           @relation(fields: [userId], references: [id])
+
+  @@map("Reviews")
+}
+
+model Wishlist {
+  id        Int            @id @default(autoincrement())
+  createdAt DateTime       @default(now())
+  
+  userId    Int
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("Wishlists")
+}

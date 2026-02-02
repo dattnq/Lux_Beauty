@@ -1,42 +1,88 @@
+/* src/app/globals.css */
+
+/* 1. Định nghĩa bộ màu thương hiệu */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --lux-pink: #f03488; /* Màu hồng đậm chủ đạo */
+  --lux-bg: #fdf2f8; /* Màu nền hồng phấn nhạt */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html,
+/* 2. Thiết lập nền chung cho cả web */
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  background-color: #f8f9fa; /* Màu xám rất nhạt (chuẩn Bootstrap) */
+  font-family: var(--font-geist-sans), sans-serif; /* Dùng font của Next.js */
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* 3. Class tiện ích: Chữ màu hồng */
+.text-lux {
+  color: var(--lux-pink) !important;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+/* 4. Class nút bấm: Màu đen sang chảnh, hover ra màu hồng */
+.btn-dark-lux {
+  background-color: #000;
+  color: #fff;
+  border-radius: 50px; /* Bo tròn kiểu viên thuốc */
+  padding: 10px 30px;
+  border: none;
+  transition: all 0.3s ease;
 }
 
-a {
-  color: inherit;
+.btn-dark-lux:hover {
+  background-color: var(--lux-pink);
+  color: white;
+  transform: translateY(-2px); /* Nhấc nhẹ nút lên khi di chuột */
+  box-shadow: 0 4px 12px rgba(219, 39, 119, 0.3);
+}
+
+/* 5. Hiệu ứng thẻ sản phẩm (Card) */
+.product-card {
+  border: none; /* Bỏ viền xấu xí mặc định */
+  transition: all 0.3s ease;
+  background: white;
+  border-radius: 12px;
+}
+
+.product-card:hover {
+  transform: translateY(-5px); /* Bay lên nhẹ */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important; /* Đổ bóng mềm */
+}
+
+/* Tinh chỉnh ảnh sản phẩm để không bị méo */
+.card-img-top {
+  transition: transform 0.5s ease;
+}
+
+.product-card:hover .card-img-top {
+  transform: scale(1.05); /* Phóng to ảnh nhẹ khi hover */
+}
+.lux-nav-link {
+  font-weight: 600;
+  color: #555;
   text-decoration: none;
+  position: relative;
+  padding: 6px 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+.lux-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0;
+  height: 2px;
+  background: var(--lux-pink);
+  transition: width 0.25s ease;
+}
+
+.lux-nav-link:hover {
+  color: var(--lux-pink);
+}
+
+.lux-nav-link:hover::after {
+  width: 100%;
+}
+
+.nav-link:hover {
+  color: var(--lux-pink) !important;
+  transform: scale(1.1);
 }
